@@ -64,8 +64,8 @@ contract StarNotary is ERC721 {
 
         require(senderOwnsToken, "The sender doens't owns any of these tokens");
 
-        _transferFrom(ower1, owner2, _tokenId1);
-        _transferFrom(ower2, owner1, _tokenId2);
+        _transferFrom(owner1, owner2, _tokenId1);
+        _transferFrom(owner2, owner1, _tokenId2);
     }
 
     function transferStar(address _to1, uint256 _tokenId) public {
@@ -73,7 +73,7 @@ contract StarNotary is ERC721 {
 
         require(msg.sender == owner, "The sender doesn't owns this token");
 
-        _transferFrom(owner, _to1, tokenId);
+        _transferFrom(owner, _to1, _tokenId);
     }
 
 }
