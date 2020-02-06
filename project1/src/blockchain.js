@@ -71,7 +71,7 @@ class Blockchain {
                 block.time = parseInt(new Date().getTime().toString().slice(0, -3));
                 if (self.chain.length > 0) {
                     let latestBlock = self.chain[self.chain.length - 1];
-                    block.previousHash = "pereba"; // latestBlock.hash;
+                    block.previousHash = latestBlock.hash;
                 }
                 block.hash = SHA256(JSON.stringify(block)).toString();
 
