@@ -105,3 +105,6 @@ dist
 
 build
 dist
+
+.infura
+deployment_out
