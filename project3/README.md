@@ -15,6 +15,6 @@ truffle-hdwallet-provider
 
 ## UML diagrams
 ![Activity](img/activity_diagram.png)
-![Sequence](img/activity_diagram.png)
-![State](img/activity_diagram.png)
-![Class](img/activity_diagram.png)
+![Sequence](img/sequence_diagram.png)
+![State](img/state_diagram.png)
+![Class](img/class_diagram.png)
