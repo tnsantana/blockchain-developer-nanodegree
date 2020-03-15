@@ -13,8 +13,14 @@ Web3 v1.2.6
 truffle-assert
 truffle-hdwallet-provider
 
-## UML diagrams
+### Activity
 ![Activity](img/activity_diagram.png)
+
+### Sequence
 ![Sequence](img/sequence_diagram.png)
+
+### State
 ![State](img/state_diagram.png)
+
+### Class
 ![Class](img/class_diagram.png)
