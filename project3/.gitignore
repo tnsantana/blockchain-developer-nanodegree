@@ -108,3 +108,5 @@ dist
 
 .infura
 deployment_out
+
+*.drawio
