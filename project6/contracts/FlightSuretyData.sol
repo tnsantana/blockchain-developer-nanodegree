@@ -1,4 +1,4 @@
-pragma solidity ^0.4.25;
+pragma solidity >=0.4.25;
 
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
@@ -71,6 +71,17 @@ contract FlightSuretyData {
                             returns(bool) 
     {
         return operational;
+    }
+
+
+    function authorizeCaller(address caller) public
+    {
+    }
+
+
+    function isAirline(address airline) public returns(bool)
+    {
+        return false;
     }
 
 
