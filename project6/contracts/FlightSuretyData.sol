@@ -192,10 +192,9 @@ contract FlightSuretyData {
     * @dev Fallback function for funding smart contract.
     *
     */
-    function() 
-                            external 
-                            payable 
+    function() external payable requireIsOperational requireAuthorizedSender
     {
+        require(msg.data.length == 0, "Fallback allowed to receive ether");
         fund();
     }
 
