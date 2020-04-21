@@ -15,6 +15,7 @@ contract FlightSuretyApp {
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
     /********************************************************************************************/
+    FlightSuretyData dataContract;
 
     // Flight status codees
     uint8 private constant STATUS_CODE_UNKNOWN = 0;
@@ -23,6 +24,10 @@ contract FlightSuretyApp {
     uint8 private constant STATUS_CODE_LATE_WEATHER = 30;
     uint8 private constant STATUS_CODE_LATE_TECHNICAL = 40;
     uint8 private constant STATUS_CODE_LATE_OTHER = 50;
+
+    uint8 private constant AUTO_APPROVED_AIRLINES = 4;
+    uint8 private constant AIRLINE_APPROVALS_DIVISOR = 2;
+    uint private constant AIRLINE_ANTE = 10 ether;
 
     address private contractOwner;          // Account used to deploy contract
 
@@ -34,6 +39,12 @@ contract FlightSuretyApp {
     }
     mapping(bytes32 => Flight) private flights;
 
+    struct AirlineApprovals {
+        bool isPending;
+        mapping(address => bool) voters;
+        uint8 votes;
+    }
+    mapping(address => AirlineApprovals) private airlineApprovals;
  
     /********************************************************************************************/
     /*                                       FUNCTION MODIFIERS                                 */
@@ -50,7 +61,7 @@ contract FlightSuretyApp {
     modifier requireIsOperational()
     {
          // Modify to call data contract's status
-        require(true, "Contract is currently not operational");
+        require(isOperational(), "Contract is currently not operational");
         _;  // All modifiers require an "_" which indicates where the function body will be added
     }
 
@@ -62,6 +73,18 @@ contract FlightSuretyApp {
         require(msg.sender == contractOwner, "Caller is not contract owner");
         _;
     }
+    
+    modifier requireRegisteredAirline()
+    {
+        require(dataContract.isAirline(msg.sender), "Not a registered Airline");
+        _;
+    }
+
+    modifier requireActiveAirline()
+    {
+        require(dataContract.isAirlineActive(msg.sender), "Not an active Airline");
+        _;
+    }
 
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
@@ -71,18 +94,19 @@ contract FlightSuretyApp {
     * @dev Contract constructor
     *
     */
-    constructor() public
+    constructor(address contractAddress) public
     {
         contractOwner = msg.sender;
+        dataContract = FlightSuretyData(contractAddress);
     }
 
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
-    function isOperational() public pure returns(bool)
+    function isOperational() public view returns(bool)
     {
-        return true;  // Modify to call data contract's status
+        return dataContract.isOperational();  // Modify to call data contract's status
     }
 
     /********************************************************************************************/
@@ -94,9 +118,38 @@ contract FlightSuretyApp {
     * @dev Add an airline to the registration queue
     *
     */
-    function registerAirline(address airline) external pure returns(bool success, uint256 votes)
+    function registerAirline(address airline) external
+    requireIsOperational requireActiveAirline returns(bool registered, uint256 votes)
     {
-        return (success, 0);
+        require(!dataContract.isAirline(airline), "Already registered");
+
+        uint256 airlinesLength = dataContract.airlinesLength();
+
+        if (airlinesLength < AUTO_APPROVED_AIRLINES) {
+            dataContract.registerAirline(airline);
+
+            return (true, 1);
+        }
+
+        if (airlineApprovals[airline].isPending) {
+            require(!airlineApprovals[airline].voters[msg.sender], "Already voted");
+            airlineApprovals[airline].voters[msg.sender] = true;
+            airlineApprovals[airline].votes++;
+        } else {
+            // first vote
+            airlineApprovals[airline] = AirlineApprovals({isPending: true, votes:1});
+            airlineApprovals[airline].voters[msg.sender] = true;
+        }
+
+        votes = airlineApprovals[airline].votes;
+
+        if (votes > airlinesLength.div(AIRLINE_APPROVALS_DIVISOR)) {
+            dataContract.registerAirline(airline);
+            registered = true;
+            delete airlineApprovals[airline];
+        }
+
+        return (registered, votes);
     }
 
 
@@ -129,6 +182,17 @@ contract FlightSuretyApp {
         oracleResponses[key] = ResponseInfo({requester: msg.sender, isOpen: true});
 
         emit OracleRequest(index, airline, flight, timestamp);
+    }
+
+
+    function fund() public payable
+    requireRegisteredAirline
+    {
+        require(msg.value >= AIRLINE_ANTE, "Minimum value is 10 ether");
+
+        // msg.sender.transfer(msg.value);
+
+        dataContract.fund(msg.sender);
     }
 
 
@@ -264,4 +328,16 @@ contract FlightSuretyApp {
 
 // endregion
 
+}
+
+
+contract FlightSuretyData {
+    function isOperational() external view returns(bool);
+
+    function isAirline(address airline) public returns(bool);
+    function isAirlineActive(address airline) public returns(bool);
+    function airlinesLength() public view returns(uint256);
+    function registerAirline(address airline) external;
+
+    function fund(address sender) public payable;
 }

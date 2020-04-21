@@ -12,7 +12,19 @@ contract FlightSuretyData {
     address private contractOwner;                                      // Account used to deploy contract
     bool private operational = true;                                    // Blocks all state changes throughout the contract if false
 
-    mapping(address => bool) private authorizedSenders;
+    struct Airline {
+        bool active;
+        bool registered;
+    }
+
+    // struct Passenger {
+    // }
+
+    mapping(address => bool) private authorizedCallers;
+    mapping(address => Airline) private airlines;
+    uint256 private airlinesLen;
+    // mapping(address => Passenger) private passengers;
+
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
@@ -25,6 +37,8 @@ contract FlightSuretyData {
     constructor() public
     {
         contractOwner = msg.sender;
+        airlines[contractOwner] = Airline({registered: true, active: false});
+        airlinesLen = 1;
     }
 
     /********************************************************************************************/
@@ -54,9 +68,9 @@ contract FlightSuretyData {
         _;
     }
 
-    modifier requireAuthorizedSender()
+    modifier requireAuthorizedCaller()
     {
-        require(authorizedSenders[msg.sender], "Unauthorized sender");
+        require(authorizedCallers[msg.sender], "Unauthorized Caller");
         _;
     }
 
@@ -75,14 +89,41 @@ contract FlightSuretyData {
     }
 
 
-    function authorizeCaller(address caller) public
+    function authorizeCaller(address caller) public requireContractOwner
     {
+        authorizedCallers[caller] = true;
     }
 
 
-    function isAirline(address airline) public returns(bool)
+    function revokeAuthorizedCaller(address caller) public requireContractOwner
     {
+        delete authorizedCallers[caller];
+    }
+
+
+    function isAirline(address airline) public view returns(bool)
+    {
+        if (airlines[airline].registered) {
+            return true;
+        }
+
         return false;
+    }
+
+
+    function isAirlineActive(address airline) public view returns(bool)
+    {
+        if (airlines[airline].active) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    function airlinesLength() public view returns(uint256)
+    {
+        return airlinesLen;
     }
 
 
@@ -105,8 +146,12 @@ contract FlightSuretyData {
     *      Can only be called from FlightSuretyApp contract
     *
     */
-    function registerAirline() external pure
+    function registerAirline(address airline) external requireAuthorizedCaller
     {
+        // require(isAirline(msg.sender), "Allowed for Airlines only");
+
+        airlines[airline] = Airline({registered: true, active: false});
+        airlinesLen++;
     }
 
 
@@ -114,7 +159,7 @@ contract FlightSuretyData {
     * @dev Buy insurance for a flight
     *
     */
-    function buy() external payable
+    function buy(uint256 amount) external payable
     {
 
     }
@@ -135,13 +180,10 @@ contract FlightSuretyData {
     {
     }
 
-   /**
-    * @dev Initial funding for the insurance. Unless there are too many delayed flights
-    *      resulting in insurance payouts, the contract should be self-sustaining
-    *
-    */
-    function fund() public payable
+    function fund(address sender) public payable requireAuthorizedCaller
     {
+        airlines[sender].active = true;
+        // TODO: emit airlined activated
     }
 
     function getFlightKey(address airline, string memory flight, uint256 timestamp) internal pure returns(bytes32)
@@ -153,9 +195,10 @@ contract FlightSuretyData {
     * @dev Fallback function for funding smart contract.
     *
     */
-    function() external payable requireIsOperational requireAuthorizedSender
+    function() external payable requireAuthorizedCaller
     {
         require(msg.data.length == 0, "Fallback allowed to receive ether");
-        fund();
+        
+        fund(msg.sender);
     }
 }
