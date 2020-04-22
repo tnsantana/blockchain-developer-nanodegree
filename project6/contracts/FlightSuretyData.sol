@@ -12,6 +12,19 @@ contract FlightSuretyData {
     address private contractOwner;                                      // Account used to deploy contract
     bool private operational = true;                                    // Blocks all state changes throughout the contract if false
 
+    struct Airline {
+        bool active;
+        bool registered;
+    }
+
+    // struct Passenger {
+    // }
+
+    mapping(address => bool) private authorizedCallers;
+    mapping(address => Airline) private airlines;
+    uint256 private airlinesLen;
+    // mapping(address => Passenger) private passengers;
+
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
     /********************************************************************************************/
@@ -21,12 +34,11 @@ contract FlightSuretyData {
     * @dev Constructor
     *      The deploying account becomes contractOwner
     */
-    constructor
-                                (
-                                ) 
-                                public 
+    constructor() public
     {
         contractOwner = msg.sender;
+        airlines[contractOwner] = Airline({registered: true, active: false});
+        airlinesLen = 1;
     }
 
     /********************************************************************************************/
@@ -38,10 +50,10 @@ contract FlightSuretyData {
 
     /**
     * @dev Modifier that requires the "operational" boolean variable to be "true"
-    *      This is used on all state changing functions to pause the contract in 
+    *      This is used on all state changing functions to pause the contract in
     *      the event there is an issue that needs to be fixed
     */
-    modifier requireIsOperational() 
+    modifier requireIsOperational()
     {
         require(operational, "Contract is currently not operational");
         _;  // All modifiers require an "_" which indicates where the function body will be added
@@ -56,6 +68,12 @@ contract FlightSuretyData {
         _;
     }
 
+    modifier requireAuthorizedCaller()
+    {
+        require(authorizedCallers[msg.sender], "Unauthorized Caller");
+        _;
+    }
+
     /********************************************************************************************/
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
@@ -64,24 +82,48 @@ contract FlightSuretyData {
     * @dev Get operating status of contract
     *
     * @return A bool that is the current operating status
-    */      
-    function isOperational() 
-                            public 
-                            view 
-                            returns(bool) 
+    */
+    function isOperational() public view returns(bool)
     {
         return operational;
     }
 
 
-    function authorizeCaller(address caller) public
+    function authorizeCaller(address caller) public requireContractOwner
     {
+        authorizedCallers[caller] = true;
     }
 
 
-    function isAirline(address airline) public returns(bool)
+    function revokeAuthorizedCaller(address caller) public requireContractOwner
     {
+        delete authorizedCallers[caller];
+    }
+
+
+    function isAirline(address airline) public view returns(bool)
+    {
+        if (airlines[airline].registered) {
+            return true;
+        }
+
         return false;
+    }
+
+
+    function isAirlineActive(address airline) public view returns(bool)
+    {
+        if (airlines[airline].active) {
+            return true;
+        }
+
+        return false;
+    }
+
+
+    function airlinesLength() public view returns(uint256)
+    {
+        return airlinesLen;
     }
 
 
@@ -89,13 +131,8 @@ contract FlightSuretyData {
     * @dev Sets contract operations on/off
     *
     * When operational mode is disabled, all write transactions except for this one will fail
-    */    
-    function setOperatingStatus
-                            (
-                                bool mode
-                            ) 
-                            external
-                            requireContractOwner 
+    */
+    function setOperatingStatus(bool mode) external requireContractOwner
     {
         operational = mode;
     }
@@ -108,25 +145,21 @@ contract FlightSuretyData {
     * @dev Add an airline to the registration queue
     *      Can only be called from FlightSuretyApp contract
     *
-    */   
-    function registerAirline
-                            (   
-                            )
-                            external
-                            pure
+    */
+    function registerAirline(address airline) external requireAuthorizedCaller
     {
+        // require(isAirline(msg.sender), "Allowed for Airlines only");
+
+        airlines[airline] = Airline({registered: true, active: false});
+        airlinesLen++;
     }
 
 
    /**
     * @dev Buy insurance for a flight
     *
-    */   
-    function buy
-                            (                             
-                            )
-                            external
-                            payable
+    */
+    function buy(uint256 amount) external payable
     {
 
     }
@@ -134,49 +167,26 @@ contract FlightSuretyData {
     /**
      *  @dev Credits payouts to insurees
     */
-    function creditInsurees
-                                (
-                                )
-                                external
-                                pure
+    function creditInsurees() external pure
     {
     }
-    
+
 
     /**
      *  @dev Transfers eligible payout funds to insuree
      *
     */
-    function pay
-                            (
-                            )
-                            external
-                            pure
+    function pay() external pure
     {
     }
 
-   /**
-    * @dev Initial funding for the insurance. Unless there are too many delayed flights
-    *      resulting in insurance payouts, the contract should be self-sustaining
-    *
-    */   
-    function fund
-                            (   
-                            )
-                            public
-                            payable
+    function fund(address sender) public payable requireAuthorizedCaller
     {
+        airlines[sender].active = true;
+        // TODO: emit airlined activated
     }
 
-    function getFlightKey
-                        (
-                            address airline,
-                            string memory flight,
-                            uint256 timestamp
-                        )
-                        pure
-                        internal
-                        returns(bytes32) 
+    function getFlightKey(address airline, string memory flight, uint256 timestamp) internal pure returns(bytes32)
     {
         return keccak256(abi.encodePacked(airline, flight, timestamp));
     }
@@ -185,13 +195,10 @@ contract FlightSuretyData {
     * @dev Fallback function for funding smart contract.
     *
     */
-    function() 
-                            external 
-                            payable 
+    function() external payable requireAuthorizedCaller
     {
-        fund();
+        require(msg.data.length == 0, "Fallback allowed to receive ether");
+        
+        fund(msg.sender);
     }
-
-
 }
-
